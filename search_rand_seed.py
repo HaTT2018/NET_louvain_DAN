@@ -21,14 +21,10 @@ def main(randseed):
     raw0 = pd.read_csv(open('./data/id2000.csv'), header=0, index_col=0)
     q = pd.read_csv('./data/q_20_aggragated.csv', index_col = 0)
     b = pd.read_csv('./data/b_20_aggragated.csv', index_col = 0)  # time occupancy, (density)
-
     q_det = q.T.mean()
     b_det = b.T.mean()
-
     nodes = np.array(raw0['id2'])
-
     relation_df = pd.read_csv('./data/edges_all.csv', header = None)
-
     relation_df['flow'] = ''
 
     for i in range(len(relation_df)):
@@ -38,29 +34,26 @@ def main(randseed):
         relation_df.iloc[i, 2] = (q_det[det1] + q_det[det2]) / 2
 
     relation = np.array(relation_df)
-
     G = nx.Graph()
     G.add_nodes_from(nodes)
     G.add_weighted_edges_from(relation)
-
     pos0 = raw0.iloc[:, 1:3]
     pos0 = np.array(pos0)
-
     vnode = pos0
     npos = dict(zip(nodes, vnode))  # 获取节点与坐标之间的映射关系，用字典表示
-
-    partition = community_louvain.best_partition(G, resolution=10, weight='weight', random_state=randseed)
+    partition = community_louvain.best_partition(G, resolution=20, weight='weight', random_state=randseed)
 
     # draw the graph
     pos = nx.spring_layout(G)
     # color the nodes according to their partition
     cmap = cm.get_cmap('viridis', max(partition.values()) + 1)
 
+    plt.figure(figsize = (10,10))
+    nx.draw_networkx(G, pos = npos, node_size=20, node_color=list(partition.values()), with_labels=False)
+    plt.savefig('./res/img/%i_net'%randseed)
     partition_results = pd.DataFrame(data = list(partition.values()))
     partition_results['node'] = nodes
-
-    partition_results.to_csv('./res/partition_results1.csv', index=False)
-
+    partition_results.to_csv('./res/%i_partition_results1.csv'%randseed, index=False)
     relation_df['if boundary nodes'] = ''
 
     for i in range(len(relation_df)):
@@ -132,12 +125,12 @@ def main(randseed):
         if var1<ini_var1 and var2<ini_var2:
             b_det[b_det['node']==node2]['class'] = class1
 
-    b_det.to_csv('./res/b_det.csv')
+    b_det.to_csv('./res/%i_b_det.csv'%randseed)
 
     id_2000 = pd.read_csv('./data/id2000.csv', index_col=0)
     id_402 = pd.read_csv('./data/selected_id.csv')
     seg = pd.read_csv('./data/segement.csv', header=None)
-    partition_results = pd.read_csv('./res/partition_results1.csv')
+    partition_results = pd.read_csv('./res/%i_partition_results1.csv'%randseed)
 
     id_402['id_node'] = ''
     for i in range(len(id_402)):
@@ -147,43 +140,51 @@ def main(randseed):
     for i in range(len(id_402)):
         id_402.iloc[i, 5] = b_det[b_det['det']==id_402.iloc[i, 0]].iloc[0, 3]
 
-    id_402.to_csv('./res/id_402_withclass.csv')
+    id_402.to_csv('./res/%i_id_402_withclass.csv'%randseed)
 
     q = pd.read_csv('./data/q_20_aggragated.csv', index_col = 0)
     b = pd.read_csv('./data/b_20_aggragated.csv', index_col = 0)  # time occupancy, (density)
     v = pd.read_csv('./data/v_20_aggragated.csv', index_col = 0)
-    id_class = pd.read_csv('./res/id_402_withclass.csv')
+    id_class = pd.read_csv('./res/%i_id_402_withclass.csv'%randseed)
 
     id_class0 = id_class[id_class.class_i == 0]
     q_c0 = q.loc[id_class0.id]
     b_c0 = b.loc[id_class0.id]
 
-    id_class0 = id_class[id_class.class_i == 1]
-    q_c1 = q.loc[id_class0.id]
-    b_c1 = b.loc[id_class0.id]
+    id_class1 = id_class[id_class.class_i == 1]
+    q_c1 = q.loc[id_class1.id]
+    b_c1 = b.loc[id_class1.id]
 
-    id_class0 = id_class[id_class.class_i == 2]
-    q_c2 = q.loc[id_class0.id]
-    b_c2 = b.loc[id_class0.id]
+    id_class2 = id_class[id_class.class_i == 2]
+    q_c2 = q.loc[id_class2.id]
+    b_c2 = b.loc[id_class2.id]
 
-    id_class0 = id_class[id_class.class_i == 3]
-    q_c3 = q.loc[id_class0.id]
-    b_c3 = b.loc[id_class0.id]
+    id_class3 = id_class[id_class.class_i == 3]
+    q_c3 = q.loc[id_class3.id]
+    b_c3 = b.loc[id_class3.id]
 
-    fig = plt.figure(figsize=[16, 16])
-    #ax1 = fig.add_subplot(221)
+    id_class4 = id_class[id_class.class_i == 4]
+    q_c4 = q.loc[id_class4.id]
+    b_c4 = b.loc[id_class4.id]
+
+    id_class5 = id_class[id_class.class_i == 5]
+    q_c5 = q.loc[id_class5.id]
+    b_c5 = b.loc[id_class5.id]
+
+    fig = plt.figure(figsize=[5, 5])
     ax2 = fig.add_subplot(111)
-    #ax3 = fig.add_subplot(223)
-    #ax4 = fig.add_subplot(224)
     ax2.set_xlim([0, 30])
     ax2.set_ylim([0, 700])
 
     ax2.scatter(x = b_c0.iloc[:,:432].mean(), y = q_c0.iloc[:,:432].mean(), s=1, c = 'b')
     ax2.scatter(x = b_c1.iloc[:,:432].mean(), y = q_c1.iloc[:,:432].mean(), s=1, c = 'g')
-    ax2.scatter(x = b_c2.iloc[:,:432].mean(), y = q_c2.iloc[:,:432].mean(), s=1, c = 'y')
+    ax2.scatter(x = b_c2.iloc[:,:432].mean(), y = q_c2.iloc[:,:432].mean(), s=1, c = 'r')
     ax2.scatter(x = b_c3.iloc[:,:432].mean(), y = q_c3.iloc[:,:432].mean(), s=1, c = 'black')
+    ax2.scatter(x = b_c4.iloc[:,:432].mean(), y = q_c4.iloc[:,:432].mean(), s=1, c = 'y')
+    ax2.scatter(x = b_c5.iloc[:,:432].mean(), y = q_c5.iloc[:,:432].mean(), s=1, c = 'grey')
 
-    plt.savefig('./res/img/%i.png'%randseed)
+    plt.savefig('./res/img/%i'%randseed)
 
-for i in range(20):
-    main(i)
+if __name__ == "__main__":
+    for i in range(20):
+        main(i)
