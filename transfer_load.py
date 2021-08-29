@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import ipdb
 from sklearn import metrics
+import matplotlib.pyplot as plt
 from keras.models import load_model,Model
 from keras.engine.topology import Layer
 from keras import backend as K
@@ -80,7 +81,7 @@ def get_class_with_node(seg, v_class):
     
     return det_list_class, v_class
 
-def rds_mat(old_dist_mat, det_ids):
+def rds_mat(old_dist_mat, det_ids, seg):
     # get a matrix that contains n raods that have specified node id s
     node_ids = np.array([])
     for i in det_ids:
@@ -112,17 +113,17 @@ def kl_divergence(set1, set2):
     set2_v_mean = np.array(set2.iloc[:, 2:-1].T.mean().T)
     return np.sum(np.where(set1_v_mean != 0, set1_v_mean * np.log(set1_v_mean / set2_v_mean), 0))
 
-def new_loss(output_final, label_train_target):
-    middle = Model(inputs=[input_data, input_HA],outputs=finish_model.get_layer('dense_1').output)
-    middle_result_source = middle.predict([image_train_source, day_train_source])
-    middle_result_target = middle.predict([image_train_target, day_train_target])
-
-    loss1 = K.mean(K.square(output_final - label_train_target), axis=-1) 
-    loss2 = 0.001 * mmd (middle_result_source, middle_result_target)
-    overall_loss = loss1 + loss2
-    return overall_loss
-
 def main(randseed, class1, class2):
+    def new_loss(output_final, label_train_target):
+        middle = Model(inputs=[input_data, input_HA],outputs=finish_model.get_layer('dense_%i'%(randseed+1)).output)
+        middle_result_source = middle.predict([image_train_source, day_train_source])
+        middle_result_target = middle.predict([image_train_target, day_train_target])
+
+        loss1 = K.mean(K.square(output_final - label_train_target), axis=-1) 
+        loss2 = 0.001 * mmd (middle_result_source, middle_result_target)
+        overall_loss = loss1 + loss2
+        return overall_loss
+
     # randseed = 3
     # class1 = 0
     # class2 = 1
@@ -155,8 +156,8 @@ def main(randseed, class1, class2):
 
     num_dets = 30
 
-    near_road1 = rds_mat(dist_mat, det_list_class1[:num_dets])
-    near_road2 = rds_mat(dist_mat, det_list_class2[:num_dets])
+    near_road1 = rds_mat(dist_mat, det_list_class1[:num_dets], seg)
+    near_road2 = rds_mat(dist_mat, det_list_class2[:num_dets], seg)
 
     v_class1 = v_class1[v_class1['id'].isin(det_list_class1[:num_dets])]
     v_class2 = v_class2[v_class2['id'].isin(det_list_class2[:num_dets])]
@@ -315,7 +316,7 @@ def main(randseed, class1, class2):
     print('mape = ' + str(mape_mean1) + '\n' + 'smape = ' + str(smape_mean1) + '\n' + 'mae = ' + str(mae_mean1))
 
     middle = Model(inputs=[input_data, input_HA]
-    ,outputs=finish_model.get_layer('dense_1').output)
+    ,outputs=finish_model.get_layer('dense_%i'%(randseed+1)).output)
 
     middle_result_source = middle.predict([image_train_source, day_train_source])
     middle_result_target = middle.predict([image_train_target, day_train_target])
@@ -350,7 +351,7 @@ def main(randseed, class1, class2):
     # mape_pd.sort_values()
     return NSk_value, mape_mean1, mape_mean2
 
-if '__name__' == '__main__':
+if __name__ == '__main__':
     class1 = 0
     class2 = 1
     NSk_value_set, mape_mean1_set, mape_mean2_set = [], [], []
@@ -361,10 +362,10 @@ if '__name__' == '__main__':
         mape_mean2_set.append(mape_mean2)
     
     fig = plt.figure()
-    ax1 = plt.add_sbuplot(131)
+    ax1 = fig.add_subplot(131)
     ax1.plot(range(20), NSk_value_set)
-    ax2 = plt.add_sbuplot(132)
+    ax2 = fig.add_subplot(132)
     ax2.plot(range(20), mape_mean1_set)
-    ax3 = plt.add_sbuplot(133)
+    ax3 = fig.add_subplot(133)
     ax3.plot(range(20), mape_mean2_set)
     plt.show()
