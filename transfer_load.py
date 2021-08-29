@@ -313,7 +313,8 @@ mae_mean = mae_loss_func(model_pre, label_test_source)
 
 print('mape = ' + str(mape_mean) + '\n' + 'smape = ' + str(smape_mean) + '\n' + 'mae = ' + str(mae_mean))
 
-middle = Model(inputs=[input_data, input_HA],outputs=finish_model.get_layer('dense_1').output)
+middle = Model(inputs=[input_data, input_HA]
+,outputs=finish_model.get_layer('dense_1').output)
 
 middle_result_source = middle.predict([image_train_source, day_train_source])
 middle_result_target = middle.predict([image_train_target, day_train_target])
@@ -345,4 +346,4 @@ for i in range(num_links):
     mape_list.append(a1)
 
 mape_pd = pd.Series(mape_list)
-mape_pd.sort_values()
+# mape_pd.sort_values()
