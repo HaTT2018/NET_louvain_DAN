@@ -179,7 +179,7 @@ def main(randseed, class1, class2):
                 NSk_set = np.append(NSk_set, NSk)
 
     print('NSk is %.3f'%NSk_set.mean())
-'''
+    '''
     ########################
     # near_road = np.array(pd.read_csv('./data/network/2small_network_nearest_road_id.csv',header = 0))
     # flow = np.array(pd.read_csv('./data/network/2small_network_speed.csv', header= 0)) #注意header=0 or None
@@ -365,6 +365,8 @@ def main(randseed, class1, class2):
     mape_pd = pd.Series(mape_list)
     # mape_pd.sort_values()
     return NSk_value, mape_mean1, mape_mean2
+    '''
+    return NSk_set.mean()
 
 if __name__ == '__main__':
     class1 = 0
@@ -385,4 +387,3 @@ if __name__ == '__main__':
     ax3 = fig.add_subplot(133)
     ax3.plot(range(plot_len), mape_mean2_set)
     plt.show()
-'''
