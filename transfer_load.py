@@ -355,7 +355,8 @@ if __name__ == '__main__':
     class1 = 0
     class2 = 1
     NSk_value_set, mape_mean1_set, mape_mean2_set = [], [], []
-    for randseed in range(10):
+    plot_len = 10
+    for randseed in range(plot_len):
         NSk_value, mape_mean1, mape_mean2 = main(randseed, class1, class2)
         NSk_value_set.append(NSk_value)
         mape_mean1_set.append(mape_mean1)
@@ -363,9 +364,9 @@ if __name__ == '__main__':
     
     fig = plt.figure()
     ax1 = fig.add_subplot(131)
-    ax1.plot(range(20), NSk_value_set)
+    ax1.plot(range(plot_len), NSk_value_set)
     ax2 = fig.add_subplot(132)
-    ax2.plot(range(20), mape_mean1_set)
+    ax2.plot(range(plot_len), mape_mean1_set)
     ax3 = fig.add_subplot(133)
-    ax3.plot(range(20), mape_mean2_set)
+    ax3.plot(range(plot_len), mape_mean2_set)
     plt.show()
