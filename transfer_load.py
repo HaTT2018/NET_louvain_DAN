@@ -137,6 +137,8 @@ def main(randseed, class1, class2):
 
     v_class1 = v[v['class_i']==class1]
     v_class2 = v[v['class_i']==class2]
+    v_class3 = v[v['class_i']==class3]
+    v_class4 = v[v['class_i']==class4]
 
     dist_mat = pd.read_csv('./data/dist_mat.csv', index_col=0)
     id_info = pd.read_csv('./data/id2000.csv', index_col=0)
@@ -153,18 +155,31 @@ def main(randseed, class1, class2):
 
     det_list_class1, v_class1 = get_class_with_node(seg, v_class1)
     det_list_class2, v_class2 = get_class_with_node(seg, v_class2)
+    det_list_class3, v_class3 = get_class_with_node(seg, v_class3)
+    det_list_class4, v_class4 = get_class_with_node(seg, v_class4)
 
     num_dets = 30
 
     near_road1 = rds_mat(dist_mat, det_list_class1[:num_dets], seg)
     near_road2 = rds_mat(dist_mat, det_list_class2[:num_dets], seg)
+    near_road3 = rds_mat(dist_mat, det_list_class3[:num_dets])
+    near_road4 = rds_mat(dist_mat, det_list_class4[:num_dets])
 
     v_class1 = v_class1[v_class1['id'].isin(det_list_class1[:num_dets])]
     v_class2 = v_class2[v_class2['id'].isin(det_list_class2[:num_dets])]
+    v_class3 = v_class3[v_class3['id'].isin(det_list_class3[:num_dets])]
+    v_class4 = v_class4[v_class4['id'].isin(det_list_class4[:num_dets])]
 
-    NSk_value = get_NSk(v_class1, v_class2)
-    print('NSk is %.3f'%NSk_value)
+    v_class_set = [v_class1, v_class2, v_class3, v_class4]
+    NSk_set = np.array([])
+    for i in range(4):
+        for j in range(4):
+            if i!=j:
+                NSk = get_NSk(v_class_set[i], v_class_set[j])
+                NSk_set = np.append(NSk_set, NSk)
 
+    print('NSk is %.3f'%NSk_set.mean())
+'''
     ########################
     # near_road = np.array(pd.read_csv('./data/network/2small_network_nearest_road_id.csv',header = 0))
     # flow = np.array(pd.read_csv('./data/network/2small_network_speed.csv', header= 0)) #注意header=0 or None
@@ -370,3 +385,4 @@ if __name__ == '__main__':
     ax3 = fig.add_subplot(133)
     ax3.plot(range(plot_len), mape_mean2_set)
     plt.show()
+'''
