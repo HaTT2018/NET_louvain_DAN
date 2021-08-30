@@ -103,7 +103,7 @@ def get_NSk(set1, set2):
     u1 = set1_v_mean.mean()
     u2 = set2_v_mean.mean()
     
-    return var1 + var2 + (u1 - u2)**2
+    return 2*var1 / (var1 + var2 + (u1 - u2)**2)
 
 def mmd (x, y):
     return metrics.mean_squared_error(x,y)
@@ -355,7 +355,7 @@ if __name__ == '__main__':
     class1 = 0
     class2 = 1
     NSk_value_set, mape_mean1_set, mape_mean2_set = [], [], []
-    for randseed in range(20):
+    for randseed in range(10):
         NSk_value, mape_mean1, mape_mean2 = main(randseed, class1, class2)
         NSk_value_set.append(NSk_value)
         mape_mean1_set.append(mape_mean1)
