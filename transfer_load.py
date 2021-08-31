@@ -113,7 +113,7 @@ def kl_divergence(set1, set2):
     set2_v_mean = np.array(set2.iloc[:, 2:-1].T.mean().T)
     return np.sum(np.where(set1_v_mean != 0, set1_v_mean * np.log(set1_v_mean / set2_v_mean), 0))
 
-def main(randseed, class1, class2):
+def main(randseed, class1, class2, class3, class4):
     def new_loss(output_final, label_train_target):
         middle = Model(inputs=[input_data, input_HA],outputs=finish_model.get_layer('dense_%i'%(randseed+1)).output)
         middle_result_source = middle.predict([image_train_source, day_train_source])
@@ -162,8 +162,8 @@ def main(randseed, class1, class2):
 
     near_road1 = rds_mat(dist_mat, det_list_class1[:num_dets], seg)
     near_road2 = rds_mat(dist_mat, det_list_class2[:num_dets], seg)
-    near_road3 = rds_mat(dist_mat, det_list_class3[:num_dets])
-    near_road4 = rds_mat(dist_mat, det_list_class4[:num_dets])
+    near_road3 = rds_mat(dist_mat, det_list_class3[:num_dets], seg)
+    near_road4 = rds_mat(dist_mat, det_list_class4[:num_dets], seg)
 
     v_class1 = v_class1[v_class1['id'].isin(det_list_class1[:num_dets])]
     v_class2 = v_class2[v_class2['id'].isin(det_list_class2[:num_dets])]
@@ -371,14 +371,20 @@ def main(randseed, class1, class2):
 if __name__ == '__main__':
     class1 = 0
     class2 = 1
+    class3 = 2
+    class4 = 3
     NSk_value_set, mape_mean1_set, mape_mean2_set = [], [], []
     plot_len = 10
     for randseed in range(plot_len):
-        NSk_value, mape_mean1, mape_mean2 = main(randseed, class1, class2)
+        '''
+        NSk_value, mape_mean1, mape_mean2 = main(randseed, class1, class2, class3, class4)
         NSk_value_set.append(NSk_value)
         mape_mean1_set.append(mape_mean1)
         mape_mean2_set.append(mape_mean2)
+        '''
+        NSk_value = main(randseed, class1, class2, class3, class4)
     
+    '''
     fig = plt.figure()
     ax1 = fig.add_subplot(131)
     ax1.plot(range(plot_len), NSk_value_set)
@@ -387,3 +393,4 @@ if __name__ == '__main__':
     ax3 = fig.add_subplot(133)
     ax3.plot(range(plot_len), mape_mean2_set)
     plt.show()
+    '''
