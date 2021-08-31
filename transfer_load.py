@@ -7,12 +7,13 @@ import pandas as pd
 import ipdb
 from sklearn import metrics
 import matplotlib.pyplot as plt
-from keras.models import load_model,Model
-from keras.engine.topology import Layer
-from keras import backend as K
+#from keras.models import load_model,Model
+#from keras.engine.topology import Layer
+#from keras import backend as K
 
 
 # 定义融合层，将深度学习算法与历史均值算法融合
+'''
 class Merge_Layer(Layer):
     def __init__(self, **kwargs):
         super(Merge_Layer, self).__init__(**kwargs)
@@ -35,7 +36,7 @@ class Merge_Layer(Layer):
 
     def compute_output_shape(self, input_shape):
         return input_shape[0]
-
+'''
 #定义精度评价指标。为防止0值附近相对误差过大而导致的异常，定义mask层。
 def mape_loss_func(preds, labels):
     mask = labels > 5
@@ -113,7 +114,7 @@ def kl_divergence(set1, set2):
     set2_v_mean = np.array(set2.iloc[:, 2:-1].T.mean().T)
     return np.sum(np.where(set1_v_mean != 0, set1_v_mean * np.log(set1_v_mean / set2_v_mean), 0))
 
-def main(randseed, class1, class2, class3, class4):
+def main(randseed):
     def new_loss(output_final, label_train_target):
         middle = Model(inputs=[input_data, input_HA],outputs=finish_model.get_layer('dense_%i'%(randseed+1)).output)
         middle_result_source = middle.predict([image_train_source, day_train_source])
@@ -127,6 +128,7 @@ def main(randseed, class1, class2, class3, class4):
     # randseed = 3
     # class1 = 0
     # class2 = 1
+
     v = pd.read_csv('./data/v_20_aggragated.csv')
     v = v.rename(columns={'Unnamed: 0': 'id'})
     det_with_class = pd.read_csv('./res/%i_id_402_withclass.csv'%randseed, index_col=0)
@@ -135,10 +137,13 @@ def main(randseed, class1, class2, class3, class4):
     for i in range(len(v)):
         v.loc[i, 'class_i'] = det_with_class[det_with_class['id']==v.loc[i, 'id']].iloc[0, 5]  # 5 stands for 'class_i'
 
-    v_class1 = v[v['class_i']==class1]
-    v_class2 = v[v['class_i']==class2]
-    v_class3 = v[v['class_i']==class3]
-    v_class4 = v[v['class_i']==class4]
+    num_class = det_with_class['class_i'].drop_duplicates().size
+
+    v_class = []
+    for i in range(num_class):
+        v_class.append(v[v['class_i']==i])
+
+    print('There are %i class(es)'%num_class)
 
     dist_mat = pd.read_csv('./data/dist_mat.csv', index_col=0)
     id_info = pd.read_csv('./data/id2000.csv', index_col=0)
@@ -153,29 +158,24 @@ def main(randseed, class1, class2, class3, class4):
 
     seg = pd.read_csv('./data/segement.csv', header=None)
 
-    det_list_class1, v_class1 = get_class_with_node(seg, v_class1)
-    det_list_class2, v_class2 = get_class_with_node(seg, v_class2)
-    det_list_class3, v_class3 = get_class_with_node(seg, v_class3)
-    det_list_class4, v_class4 = get_class_with_node(seg, v_class4)
-
+    det_list_class = []
     num_dets = 30
+    for i in range(num_class):
+        det_list_class_temp, v_class_temp = get_class_with_node(seg, v_class[i])
+        det_list_class.append(det_list_class_temp)
+        v_class_temp = v_class_temp[v_class_temp['id'].isin(det_list_class_temp[:num_dets])]
+        v_class[i] = v_class_temp
 
-    near_road1 = rds_mat(dist_mat, det_list_class1[:num_dets], seg)
-    near_road2 = rds_mat(dist_mat, det_list_class2[:num_dets], seg)
-    near_road3 = rds_mat(dist_mat, det_list_class3[:num_dets], seg)
-    near_road4 = rds_mat(dist_mat, det_list_class4[:num_dets], seg)
 
-    v_class1 = v_class1[v_class1['id'].isin(det_list_class1[:num_dets])]
-    v_class2 = v_class2[v_class2['id'].isin(det_list_class2[:num_dets])]
-    v_class3 = v_class3[v_class3['id'].isin(det_list_class3[:num_dets])]
-    v_class4 = v_class4[v_class4['id'].isin(det_list_class4[:num_dets])]
-
-    v_class_set = [v_class1, v_class2, v_class3, v_class4]
+    near_road = []
+    for i in range(num_class):
+        near_road.append(rds_mat(dist_mat, det_list_class[i][:num_dets], seg))
+    
     NSk_set = np.array([])
-    for i in range(4):
-        for j in range(4):
+    for i in range(num_class):
+        for j in range(num_class):
             if i!=j:
-                NSk = get_NSk(v_class_set[i], v_class_set[j])
+                NSk = get_NSk(v_class[i], v_class[j])
                 NSk_set = np.append(NSk_set, NSk)
 
     print('NSk is %.3f'%NSk_set.mean())
@@ -369,10 +369,6 @@ def main(randseed, class1, class2, class3, class4):
     return NSk_set.mean()
 
 if __name__ == '__main__':
-    class1 = 0
-    class2 = 1
-    class3 = 2
-    class4 = 3
     NSk_value_set, mape_mean1_set, mape_mean2_set = [], [], []
     plot_len = 10
     for randseed in range(plot_len):
@@ -382,7 +378,7 @@ if __name__ == '__main__':
         mape_mean1_set.append(mape_mean1)
         mape_mean2_set.append(mape_mean2)
         '''
-        NSk_value = main(randseed, class1, class2, class3, class4)
+        NSk_value = main(randseed)
     
     '''
     fig = plt.figure()
