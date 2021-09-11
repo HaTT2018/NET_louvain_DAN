@@ -455,6 +455,6 @@ def main(randseed, resolution):
         os.remove('./res/%i_res%i_id_402_withclass.csv'%(randseed, resolution))
 
 if __name__ == '__main__':
-    resolution = 18
+    resolution = 12
     for i in range(100):
         main(i, resolution)
