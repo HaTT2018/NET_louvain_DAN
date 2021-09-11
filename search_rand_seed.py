@@ -8,7 +8,7 @@ import networkx.algorithms.community as nxcom
 from community import community_louvain
 import os
 
-def main(randseed):
+def main(randseed, resolution):
 
     def get_corr(data):
         data = np.array(q)
@@ -148,7 +148,7 @@ def main(randseed):
     vnode = pos0
     npos = dict(zip(nodes, vnode))  # 获取节点与坐标之间的映射关系，用字典表示
 
-    partition = community_louvain.best_partition(G, resolution=15, weight='weight', random_state=randseed)
+    partition = community_louvain.best_partition(G, resolution=resolution, weight='weight', random_state=randseed)
 
     # draw the graph
     pos = nx.spring_layout(G)
@@ -166,9 +166,9 @@ def main(randseed):
     det_partition_results2 = get_det_partition_results(seg, partition_results, side=2)
 
 
-    partition_results.to_csv('./res/%i_partition_results.csv'%randseed, index=False)
-    det_partition_results1.to_csv('./res/%i_det_partition_results1.csv'%randseed, index=False)
-    det_partition_results2.to_csv('./res/%i_det_partition_results2.csv'%randseed, index=False)
+    partition_results.to_csv('./res/%i_res%i_partition_results.csv'%(randseed, resolution), index=False)
+    det_partition_results1.to_csv('./res/%i_res%i_det_partition_results1.csv'%(randseed, resolution), index=False)
+    det_partition_results2.to_csv('./res/%i_res%i_det_partition_results2.csv'%(randseed, resolution), index=False)
 
     b_det = pd.DataFrame(b_det)
     b_det['det'] = b_det.index
@@ -203,11 +203,17 @@ def main(randseed):
             n2d1 = bound_dets_df1.iloc[i, 1]
             n2d2 = bound_dets_df2.iloc[i, 1]
             
-            node1 = b_det[b_det['det']==n1d1].iloc[0, 2]  # 2 means node
-            node2 = b_det[b_det['det']==n2d1].iloc[0, 2]
+            try:
+                node1 = b_det[b_det['det']==n1d1].iloc[0, 2]  # 2 means node
+            except:
+                node1 = b_det[b_det['det']==n1d2].iloc[0, 2]  # 2 means node
+            try:
+                node2 = b_det[b_det['det']==n2d1].iloc[0, 2]
+            except:
+                node2 = b_det[b_det['det']==n2d2].iloc[0, 2]
 
-            class1 = b_det[b_det['det']==n1d1].iloc[0, 3]  # 3 means class
-            class2 = b_det[b_det['det']==n2d1].iloc[0, 3]
+            class1 = b_det[b_det['node']==node1].iloc[0, 3]  # 3 means class
+            class2 = b_det[b_det['node']==node2].iloc[0, 3]
 
             b1 = b_det[b_det['class']==class1]
             b2 = b_det[b_det['class']==class2]
@@ -230,12 +236,12 @@ def main(randseed):
                 # print(det_partition_results1[det_partition_results1[0]==class1].shape[0])
 
 
-    b_det.to_csv('./res/%i_b_det.csv'%randseed)
+    b_det.to_csv('./res/%i_res%i_b_det.csv'%(randseed, resolution))
 
     id_2000 = pd.read_csv('./data/id2000.csv', index_col=0)
     id_402 = pd.read_csv('./data/selected_id.csv')
     seg = pd.read_csv('./data/segement.csv', header=None)
-    partition_results = pd.read_csv('./res/%i_partition_results.csv'%randseed)
+    partition_results = pd.read_csv('./res/%i_res%i_partition_results.csv'%(randseed, resolution))
 
     id_402['id_node'] = ''
     for i in range(len(id_402)):
@@ -245,12 +251,12 @@ def main(randseed):
     for i in range(len(id_402)):
         id_402.iloc[i, 5] = b_det[b_det['det']==id_402.iloc[i, 0]].iloc[0, 3]
     
-    id_402.to_csv('./res/%i_id_402_withclass.csv'%randseed)
+    id_402.to_csv('./res/%i_res%i_id_402_withclass.csv'%(randseed, resolution))
 
     q = pd.read_csv('./data/q_20_aggragated.csv', index_col = 0)
     b = pd.read_csv('./data/b_20_aggragated.csv', index_col = 0)  # time occupancy, (density)
     v = pd.read_csv('./data/v_20_aggragated.csv', index_col = 0)
-    id_class = pd.read_csv('./res/%i_id_402_withclass.csv'%randseed)
+    id_class = pd.read_csv('./res/%i_res%i_id_402_withclass.csv'%(randseed, resolution))
 
     id_class0 = id_class[id_class.class_i == 0]
     q_c0 = q.loc[id_class0.id]
@@ -368,7 +374,7 @@ def main(randseed):
 
     v = pd.read_csv('./data/v_20_aggragated.csv')
     v = v.rename(columns={'Unnamed: 0': 'id'})
-    det_with_class = pd.read_csv('./res/%i_id_402_withclass.csv'%randseed, index_col=0)
+    det_with_class = pd.read_csv('./res/%i_res%i_id_402_withclass.csv'%(randseed, resolution), index_col=0)
 
     v['class_i'] = ''
     for i in range(len(v)):
@@ -428,8 +434,8 @@ def main(randseed):
     # print(NSk_set.mean())
     # save result if it is good
     if NSk_set.mean() < 0.92:
-        fig_net.savefig('./res/img/%i_net'%randseed)
-        fig_MFD.savefig('./res/img/%i'%randseed)
+        fig_net.savefig('./res/img/%i_res%i_net'%(randseed, resolution))
+        fig_MFD.savefig('./res/img/%i_res%i_MFD'%(randseed, resolution))
 
         ind_df = pd.DataFrame([], index=range(1), columns=['NSk_mean', 'NSk_min', 'NSk_max', 'NSk_std', 'TV', 'CH'])
         ind_df.loc[0, 'NSk_mean'] = NSk_set.mean()
@@ -440,14 +446,15 @@ def main(randseed):
         ind_df.loc[0, 'TV'] = TV
         ind_df.loc[0, 'CH'] = CH
 
-        ind_df.to_csv('./res/%i_index.csv'%randseed)
+        ind_df.to_csv('./res/%i_res%i_index.csv'%(randseed, resolution))
     else:
-        os.remove('./res/%i_b_det.csv'%randseed)
-        os.remove('./res/%i_det_partition_results1.csv'%randseed)
-        os.remove('./res/%i_det_partition_results2.csv'%randseed)
-        os.remove('./res/%i_partition_results.csv'%randseed)
-        os.remove('./res/%i_id_402_withclass.csv'%randseed)
+        os.remove('./res/%i_res%i_b_det.csv'%(randseed, resolution))
+        os.remove('./res/%i_res%i_det_partition_results1.csv'%(randseed, resolution))
+        os.remove('./res/%i_res%i_det_partition_results2.csv'%(randseed, resolution))
+        os.remove('./res/%i_res%i_partition_results.csv'%(randseed, resolution))
+        os.remove('./res/%i_res%i_id_402_withclass.csv'%(randseed, resolution))
 
 if __name__ == '__main__':
+    resolution = 18
     for i in range(100):
-        main(i)
+        main(i, resolution)
