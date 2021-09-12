@@ -281,6 +281,34 @@ def main(randseed, resolution):
     id_class5 = id_class[id_class.class_i == 5]
     q_c5 = q.loc[id_class5.id]
     b_c5 = b.loc[id_class5.id]
+    
+    id_class5 = id_class[id_class.class_i == 5]
+    q_c5 = q.loc[id_class5.id]
+    b_c5 = b.loc[id_class5.id]
+    
+    id_class5 = id_class[id_class.class_i == 5]
+    q_c5 = q.loc[id_class5.id]
+    b_c5 = b.loc[id_class5.id]
+    
+    id_class6 = id_class[id_class.class_i == 6]
+    q_c6 = q.loc[id_class6.id]
+    b_c6 = b.loc[id_class6.id]
+    
+    id_class7 = id_class[id_class.class_i == 7]
+    q_c7 = q.loc[id_class7.id]
+    b_c7 = b.loc[id_class7.id]
+    
+    id_class8 = id_class[id_class.class_i == 8]
+    q_c8 = q.loc[id_class8.id]
+    b_c8 = b.loc[id_class8.id]
+    
+    id_class9 = id_class[id_class.class_i == 9]
+    q_c9 = q.loc[id_class9.id]
+    b_c9 = b.loc[id_class9.id]
+    
+    id_class10 = id_class[id_class.class_i == 10]
+    q_c10 = q.loc[id_class10.id]
+    b_c10 = b.loc[id_class10.id]
 
     fig_MFD = plt.figure(figsize=[5, 5])
     ax2 = fig_MFD.add_subplot(111)
@@ -293,6 +321,11 @@ def main(randseed, resolution):
     ax2.scatter(x = b_c3.iloc[:,:432].mean(), y = q_c3.iloc[:,:432].mean(), s=1, c = 'black')
     ax2.scatter(x = b_c4.iloc[:,:432].mean(), y = q_c4.iloc[:,:432].mean(), s=1, c = 'r')
     ax2.scatter(x = b_c5.iloc[:,:432].mean(), y = q_c5.iloc[:,:432].mean(), s=1, c = 'grey')
+    ax2.scatter(x = b_c6.iloc[:,:432].mean(), y = q_c6.iloc[:,:432].mean(), s=1, c = 'pink')
+    ax2.scatter(x = b_c7.iloc[:,:432].mean(), y = q_c7.iloc[:,:432].mean(), s=1, c = 'purple')
+    ax2.scatter(x = b_c8.iloc[:,:432].mean(), y = q_c8.iloc[:,:432].mean(), s=1, c = 'lightblue')
+    ax2.scatter(x = b_c9.iloc[:,:432].mean(), y = q_c9.iloc[:,:432].mean(), s=1, c = 'coral')
+    ax2.scatter(x = b_c10.iloc[:,:432].mean(), y = q_c10.iloc[:,:432].mean(), s=1, c = 'lightgreen')
 
 
     # CH index
@@ -433,7 +466,7 @@ def main(randseed, resolution):
 
     # print(NSk_set.mean())
     # save result if it is good
-    if NSk_set.mean() < 0.92:
+    if NSk_set.mean() < 92:
         fig_net.savefig('./res/img/%i_res%i_net'%(randseed, resolution))
         fig_MFD.savefig('./res/img/%i_res%i_MFD'%(randseed, resolution))
 
@@ -455,6 +488,8 @@ def main(randseed, resolution):
         os.remove('./res/%i_res%i_id_402_withclass.csv'%(randseed, resolution))
 
 if __name__ == '__main__':
-    for resolution in range(20):
+    for resolution in range(11, 20):
         for i in range(100):
+            print('Doing %i %i'%(resolution, i))
             main(i, resolution)
+            plt.close('all')
