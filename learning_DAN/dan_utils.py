@@ -1,5 +1,7 @@
 import numpy as np
-
+import torch
+import random
+import tensorflow as tf
 
 def mape_loss_func(preds, labels):
     mask = labels > 5
@@ -111,3 +113,13 @@ def sliding_window(flow, near_road, from_day, to_day, prop, k, t_p, t_input, t_p
     print(label_test.shape)
     
     return image_train, image_test, day_train, day_test, label_train, label_test
+
+def setup_seed(seed):
+    try:
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)    
+        torch.backends.cudnn.deterministic = True
+    except:
+        tf.random.set_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
