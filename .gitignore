@@ -2,3 +2,4 @@
 network_classification/img/.DS_Store
 env/.DS_Store
 .DS_Store
+*.pyc
