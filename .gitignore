@@ -3,4 +3,7 @@ network_classification/img/.DS_Store
 env/.DS_Store
 .DS_Store
 *.pyc
-*.ipynb
+learning_DAN/.ipynb_checkpoints/base_FC-checkpoint.ipynb
+learning_DAN/.ipynb_checkpoints/base_ST-DTNN-checkpoint.ipynb
+learning_DAN/.ipynb_checkpoints/base_FC-checkpoint.ipynb
+learning_DAN/.ipynb_checkpoints/base_ST-DTNN-checkpoint.ipynb

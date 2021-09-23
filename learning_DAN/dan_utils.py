@@ -4,15 +4,15 @@ import random
 import tensorflow as tf
 
 def mape_loss_func(preds, labels):
-    mask = labels > 5
+    mask = labels > .05
     return np.mean(np.fabs(labels[mask]-preds[mask])/labels[mask])
 
 def smape_loss_func(preds, labels):
-    mask= labels > 5
+    mask= labels > .05
     return np.mean(2*np.fabs(labels[mask]-preds[mask])/(np.fabs(labels[mask])+np.fabs(preds[mask])))
 
 def mae_loss_func(preds, labels):
-    mask= labels > 5
+    mask= labels > .05
     return np.fabs((labels[mask]-preds[mask])).mean()
 
 def eliminate_nan(b):
@@ -123,3 +123,15 @@ def setup_seed(seed):
         tf.random.set_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+def save_np(array, name):
+    np.savetxt(name, array, delimiter=',')
+
+def norm_data(vec):
+#     ipdb.set_trace()
+    # vec = vec.flatten()
+    vec_res = (vec.T - np.min(vec.T, axis=0))/(np.max(vec.T, axis=0) - np.min(vec.T, axis=0))
+    return vec_res.T, np.min(vec.T, axis=0).T, np.max(vec.T, axis=0).T
+
+def denorm_data(vec, min_val, max_val):
+    return vec*(max_val - min_val) + min_val
