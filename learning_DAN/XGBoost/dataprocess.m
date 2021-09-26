@@ -1,4 +1,4 @@
-clear all
+clear
 load ../RF/V.mat
 V2=V2';
 pre=[];
@@ -22,4 +22,8 @@ for i=1:25
     x_test=[x_test;temp3];
     y_test=[y_test;temp4];
 end
+
+x_train = x_train(1:144*3*25, :);
+y_train = y_train(1:144*3*25, :);
+
 save('data2_6.mat','x_train','y_train','x_test','y_test');
