@@ -62,7 +62,7 @@ def sliding_window(flow, near_road, from_day, to_day, prop, k, t_p, t_input, t_p
     flow = np.array(flow)
     # 选数据
     flow = flow[:, 144*(from_day-1):144*(to_day)]
-    print(flow.shape)
+#     print(flow.shape)
 
     # 利用滑动窗口的方式，重构数据为(n，最近路段数，输入时间窗，总路段数)的形式
     '''
@@ -73,15 +73,16 @@ def sliding_window(flow, near_road, from_day, to_day, prop, k, t_p, t_input, t_p
     num_links #参数num_links为总路段数
     '''
 
-
     image = []
     for i in range(np.shape(near_road)[0]):
         road_id = []
         for j in range(k):
             road_id.append(near_road[i][j])
         image.append(flow[road_id, :])
-    image1 = np.reshape(image, [-1, k, len(flow[0,:])])
+#     ipdb.set_trace()
+    image1 = np.reshape(image, [-1, k, flow.shape[1]])
     image2 = np.transpose(image1,(1,2,0))
+#     print(image1.shape)
     image3 = []
     label = []
     day = []
@@ -92,6 +93,7 @@ def sliding_window(flow, near_road, from_day, to_day, prop, k, t_p, t_input, t_p
             label.append(flow[:, i*144+j+t_input:i*144+j+t_input+t_pre][:])
             day.append(flow[:, (i-1)*144+j+t_input:(i-1)*144+j+t_input+t_pre][:])
 
+#     ipdb.set_trace()
     image3 = np.asarray(image3)
     label = np.asarray(label)
     day =  np.asarray(day)
@@ -113,6 +115,7 @@ def sliding_window(flow, near_road, from_day, to_day, prop, k, t_p, t_input, t_p
     print(label_test.shape)
     
     return image_train, image_test, day_train, day_test, label_train, label_test
+
 
 def setup_seed(seed):
     try:
@@ -136,61 +139,3 @@ def norm_data(vec):
 def denorm_data(vec, min_val, max_val):
     return vec*(max_val - min_val) + min_val
 
-def cal_L2_dist(total):
-    try:
-        total0 = np.broadcast_to(np.expand_dims(total, axis=0), (int(total.shape[0]), int(total.shape[0]), int(total.shape[1])))
-        total1 = np.broadcast_to(np.expand_dims(total, axis=1), (int(total.shape[0]), int(total.shape[0]), int(total.shape[1])))
-        # total0 = total.unsqueeze(0).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
-        # total1 = total.unsqueeze(1).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
-        L2_distance = ((total0-total1)**2).sum(2)
-    except:
-        total_cpu = total
-        len_ = total_cpu.shape[0]
-        L2_distance = np.zeros([len_, len_])
-        for i in range(total_cpu.shape[1]):
-            total0 = np.broadcast_to(np.expand_dims(total_cpu[:, i], axis=0), (int(total_cpu.shape[0]), int(total_cpu.shape[0])))
-            total1 = np.broadcast_to(np.expand_dims(total_cpu[:, i], axis=1), (int(total_cpu.shape[0]), int(total_cpu.shape[0])))
-            # total0 = total_cpu[:, i].unsqueeze(0).expand(int(total_cpu.size(0)), int(total_cpu.size(0)))
-            # total1 = total_cpu[:, i].unsqueeze(1).expand(int(total_cpu.size(0)), int(total_cpu.size(0)))
-            L2_dist = (total0 - total1)**2
-            L2_distance += L2_dist
-    return L2_distance
-
-def guassian_kernel(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
-    #source = source.cpu()
-    #target = target.cpu()
-    n_samples = int(source.size)+int(target.size)  # number of samples
-    total = np.concatenate([source, target], axis=0)
-    L2_distance = cal_L2_dist(total)
-                       
-    if fix_sigma:
-        bandwidth = fix_sigma
-    else:
-        bandwidth = np.sum(L2_distance.data) / (n_samples**2-n_samples)  # 可能出问题
-    bandwidth /= kernel_mul ** (kernel_num // 2)
-    bandwidth_list = [bandwidth * (kernel_mul**i) for i in range(kernel_num)]
-    kernel_val = [np.exp(-L2_distance / bandwidth_temp) for bandwidth_temp in bandwidth_list]
-    return sum(kernel_val)  #/len(kernel_val)
-
-def mmd_rbf_accelerate(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
-    batch_size = int(source.size)
-    kernels = guassian_kernel(source, target,
-        kernel_mul=kernel_mul, kernel_num=kernel_num, fix_sigma=fix_sigma)
-    loss = 0
-    for i in range(batch_size):
-        s1, s2 = i, (i+1) % batch_size
-        t1, t2 = s1 + batch_size, s2 + batch_size
-        loss += kernels[s1, s2] + kernels[t1, t2]
-        loss -= kernels[s1, t2] + kernels[s2, t1]
-    return loss / float(batch_size)
-
-def mmd_rbf_noaccelerate(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
-    batch_size = int(source.size)
-    kernels = guassian_kernel(source, target,
-                              kernel_mul=kernel_mul, kernel_num=kernel_num, fix_sigma=fix_sigma)
-    XX = kernels[:batch_size, :batch_size]
-    YY = kernels[batch_size:, batch_size:]
-    XY = kernels[:batch_size, batch_size:]
-    YX = kernels[batch_size:, :batch_size]
-    loss = np.mean(XX + YY - XY -YX)
-    return loss
