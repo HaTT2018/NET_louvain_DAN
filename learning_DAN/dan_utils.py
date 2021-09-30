@@ -141,6 +141,8 @@ def denorm_data(vec, min_val, max_val):
     return vec*(max_val - min_val) + min_val
 
 def load_data(class_set, res=11, randseed=25):
+    # Return:
+    # det_list_class: all the detectors of class i before manual selection
     # 把矩阵分类
     setup_seed(randseed)
 
@@ -212,6 +214,9 @@ def load_data(class_set, res=11, randseed=25):
         cls_ = class_set[i]
         det_set = selected_nodes.loc[selected_nodes['class']==cls_, 'node'].values
         v_class[cls_] = v_class[cls_].loc[v_class[cls_]['id2'].isin(det_set)]  # id means detID, id2 memans nodeID
+    det_num_min = min([v_class[i].shape[0] for i in class_set])
+    for i in class_set:
+        v_class[i] = v_class.iloc[:det_num_min, :]
 
     # make near_road matrix
     near_road_set = []
