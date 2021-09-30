@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import random
 import tensorflow as tf
+import pandas as pd
 
 def mape_loss_func(preds, labels):
     mask = labels > .05
@@ -139,3 +140,84 @@ def norm_data(vec):
 def denorm_data(vec, min_val, max_val):
     return vec*(max_val - min_val) + min_val
 
+def load_data(class_set, res=11, randseed=25):
+    # 把矩阵分类
+    setup_seed(randseed)
+
+    v = pd.read_csv('../data/q_20_aggragated.csv')
+    v = v.rename(columns={'Unnamed: 0': 'id'})
+    id_402 = pd.read_csv('../res/%i_res%i_id_402_withclass.csv'%(randseed, res), index_col=0)
+    part1 = pd.read_csv('../res/%i_res%i_det_partition_results1.csv'%(randseed, res))
+    part2 = pd.read_csv('../res/%i_res%i_det_partition_results2.csv'%(randseed, res))
+
+    v['class_i'] = ''
+    for i in range(len(v)):
+        v.loc[i, 'class_i'] = id_402[id_402['id']==v.loc[i, 'id']].iloc[0, 5]  # 5 stands for 'class_i'
+
+    num_class = id_402['class_i'].drop_duplicates().size
+
+    v_class = []
+    for i in range(num_class):
+        v_class.append(v[v['class_i']==i])
+
+    print('There are %i class(es)'%num_class)
+
+    # 制作 nearest_road_id.csv 和speed.csv
+    dist_mat = pd.read_csv('../data/dist_mat.csv', index_col=0)
+    id_info = pd.read_csv('../data/id2000.csv', index_col=0)
+    dist_mat.index = id_info['id2']
+    dist_mat.columns = id_info['id2']
+    for i in range(len(dist_mat)):
+        for j in range(len(dist_mat)):
+            if i==j:
+                dist_mat.iloc[i, j] = 0
+
+    near_id = pd.DataFrame(np.argsort(np.array(dist_mat)), index = id_info['id2'], columns = id_info['id2'])
+
+    # ## 以上做好了near_road矩阵，接下来做flow/speed矩阵
+    seg = pd.read_csv('../data/segement.csv', header=None)
+
+    det_list_class = []
+    for i in range(num_class):
+        det_list_class_temp, v_class_temp = get_class_with_node(seg, v_class[i])
+        det_list_class.append(det_list_class_temp[:])
+        v_class_temp = v_class_temp.loc[v_class_temp['id'].isin(det_list_class_temp[:])]
+        v_class[i] = v_class_temp
+
+    # Select detectors manually, then assemble v_class matrix
+    selected_dets1 = pd.read_csv('../network_classification/selected_dets1.csv', index_col=0)
+    selected_dets2 = pd.read_csv('../network_classification/selected_dets2.csv', index_col=0)
+    selected_nodes = pd.read_csv('../network_classification/selected_nodes.csv', index_col=0)
+
+    # selected_nodes = pd.DataFrame([], index=range(len(selected_dets)), columns=['class', 'node'])
+    # for i in range(len(selected_dets)):
+    #     det_ = selected_dets.loc[i, 'det']
+    #     class_ = selected_dets.loc[i, 'class']
+    #     node_ = seg.loc[seg[6]==det_, 0].values[0]
+    #     selected_nodes.loc[i, 'class'] = class_
+    #     selected_nodes.loc[i, 'node'] = node_
+    # selected_nodes.to_csv('../network_classification/selected_nodes.csv')
+
+    # selected_dets2 = pd.DataFrame([], index=range(len(selected_dets)), columns=['class', 'det'])
+    # for i in range(len(selected_nodes)):
+    #     node_ = selected_nodes.loc[i, 'node']
+    #     class_ = selected_nodes.loc[i, 'class']
+    #     det = seg.loc[seg[0]==node_, 7]
+    #     selected_dets2.loc[i, 'class'] = class_
+    #     selected_dets2.loc[i, 'det'] = det_
+    # selected_dets2.to_csv('../network_classification/selected_dets2.csv')
+
+    # filt, so that only selected dets remain
+    for i in range(len(class_set)):
+        cls_ = class_set[i]
+        det_set = selected_nodes.loc[selected_nodes['class']==cls_, 'node'].values
+        v_class[cls_] = v_class[cls_].loc[v_class[cls_]['id2'].isin(det_set)]  # id means detID, id2 memans nodeID
+
+    # make near_road matrix
+    near_road_set = []
+    for i in range(num_class):
+        det_set = v_class[i]['id'].values
+    #     ipdb.set_trace()
+        near_road_set.append(rds_mat(dist_mat, det_set, seg))
+
+    return v, v_class, id_402, part1, part2, seg, det_list_class, near_road_set
