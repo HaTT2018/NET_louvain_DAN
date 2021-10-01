@@ -1,392 +1,374 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Transfer Learning on a network, where roads are clustered into classes
+
+# In[1]:
+
+
 import time
 import math
-import tensorflow as tf
-import keras 
 import numpy as np
 import pandas as pd
-import ipdb
-from sklearn import metrics
 import matplotlib.pyplot as plt
-#from keras.models import load_model,Model
-#from keras.engine.topology import Layer
-#from keras import backend as K
+import ipdb
 
 
-# 定义融合层，将深度学习算法与历史均值算法融合
-'''
-class Merge_Layer(Layer):
-    def __init__(self, **kwargs):
-        super(Merge_Layer, self).__init__(**kwargs)
+# In[2]:
 
-    def build(self, input_shape):
-        self.para1 = self.add_weight(shape=(input_shape[0][1], input_shape[0][2]),
-                                     initializer='uniform', trainable=True,
-                                     name='para1')
-        self.para2 = self.add_weight(shape=(input_shape[1][1], input_shape[1][2]),
-                                     initializer='uniform', trainable=True,
-                                     name='para2')
-        super(Merge_Layer, self).build(input_shape)
 
-    def call(self, inputs):
-        mat1 = inputs[0]
-        mat2 = inputs[1]
-        output = mat1 * self.para1 + mat2 * self.para2
-        # output = mat1 * 0.1 + mat2 * 0.9
-        return output
+import tensorflow as tf
+from tensorflow.keras.models import load_model, Model
+from tensorflow.keras import backend as K
+import tensorflow.keras as keras
+from tensorflow.keras.layers import Layer
+import dan_models
+import dan_utils
 
-    def compute_output_shape(self, input_shape):
-        return input_shape[0]
-'''
-#定义精度评价指标。为防止0值附近相对误差过大而导致的异常，定义mask层。
-def mape_loss_func(preds, labels):
-    mask = labels > 5
-    return np.mean(np.fabs(labels[mask]-preds[mask])/labels[mask])
+def main(class_src, class_tar):
+    # In[3]:
 
-def smape_loss_func(preds, labels):
-    mask= labels > 5
-    return np.mean(2*np.fabs(labels[mask]-preds[mask])/(np.fabs(labels[mask])+np.fabs(preds[mask])))
 
-def mae_loss_func(preds, labels):
-    mask= labels > 5
-    return np.fabs((labels[mask]-preds[mask])).mean()
+    physical_devices = tf.config.list_physical_devices('GPU') 
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-def eliminate_nan(b):
-    a = np.array(b)
-    c = a[~np.isnan(a)]
-    return c
 
-def get_node(det, seg):
-    # det is one single detector id
-    # node is one single node id
-    
-    # seg = pd.read_csv('./data/segement.csv', header=None)
-    try:
-        node_info = seg[seg[6]==det]
-        node = node_info.iloc[0, 0]
-    except:
-        node_info = seg[seg[7]==det]
-        node = node_info.iloc[0, 0]
+    # # Load data
+
+    # In[4]:
+
+
+    class_set = [2, 3, 4]
+    randseed = 25
+    res = 11
+    v, v_class, id_402, part1, part2, seg, det_list_class, near_road_set          = dan_utils.load_data(class_set, res, randseed)
+
+    # ind, class
+    # 0  , blue
+    # 1  , green
+    # 2  , yellow  <--
+    # 3  , black   <--
+    # 4  , red     <--
+    class_color_set = ['b', 'g', 'y', 'black', 'r']
+
+    # ## Evaluation of 2 datasets
+
+    # In[8]:
+
+
+    def get_NSk(set1, set2):
+        # designated for v_class1 and 2
+        set1_v_mean = set1.iloc[:, 2:-1].T.mean().T
+        set2_v_mean = set2.iloc[:, 2:-1].T.mean().T
         
-    return node
-
-def get_class_with_node(seg, v_class):
-    det_list_class = np.array([])
-    try:
-        v_class.insert(1, 'id2', '')  # id2 mean node id
-    except:
-        v_class['id2'] = ''
+        var1 = set1_v_mean.std()**2
+        var2 = set2_v_mean.std()**2
         
-    for i in range(len(v_class)):
-        det_list_class = np.append(det_list_class, v_class.iloc[i, 0])
-        v_class.iloc[i, 1] = get_node(v_class.iloc[i, 0], seg)
-    
-    return det_list_class, v_class
-
-def rds_mat(old_dist_mat, det_ids, seg):
-    # get a matrix that contains n raods that have specified node id s
-    node_ids = np.array([])
-    for i in det_ids:
-        node_ids = np.append(node_ids, get_node(i, seg))
+        u1 = set1_v_mean.mean()
+        u2 = set2_v_mean.mean()
         
-    new_dist_mat = old_dist_mat.loc[node_ids, node_ids]
-    old_dist_mat = np.array(old_dist_mat)
-    new_near_id_mat = np.argsort(new_dist_mat)
-    return new_near_id_mat
-
-def get_NSk(set1, set2):
-    # designated for v_class1 and 2
-    set1_v_mean = set1.iloc[:, 2:-1].T.mean().T
-    set2_v_mean = set2.iloc[:, 2:-1].T.mean().T
-    
-    var1 = set1_v_mean.std()**2
-    var2 = set2_v_mean.std()**2
-    
-    u1 = set1_v_mean.mean()
-    u2 = set2_v_mean.mean()
-    
-    return 2*var1 / (var1 + var2 + (u1 - u2)**2)
-
-def mmd (x, y):
-    return metrics.mean_squared_error(x,y)
-
-def kl_divergence(set1, set2):
-    set1_v_mean = np.array(set1.iloc[:, 2:-1].T.mean().T)
-    set2_v_mean = np.array(set2.iloc[:, 2:-1].T.mean().T)
-    return np.sum(np.where(set1_v_mean != 0, set1_v_mean * np.log(set1_v_mean / set2_v_mean), 0))
-
-def main(randseed):
-    def new_loss(output_final, label_train_target):
-        middle = Model(inputs=[input_data, input_HA],outputs=finish_model.get_layer('dense_%i'%(randseed+1)).output)
-        middle_result_source = middle.predict([image_train_source, day_train_source])
-        middle_result_target = middle.predict([image_train_target, day_train_target])
-
-        loss1 = K.mean(K.square(output_final - label_train_target), axis=-1) 
-        loss2 = 0.001 * mmd (middle_result_source, middle_result_target)
-        overall_loss = loss1 + loss2
-        return overall_loss
-
-    # randseed = 3
-    # class1 = 0
-    # class2 = 1
-
-    v = pd.read_csv('./data/v_20_aggragated.csv')
-    v = v.rename(columns={'Unnamed: 0': 'id'})
-    det_with_class = pd.read_csv('./res/%i_id_402_withclass.csv'%randseed, index_col=0)
-
-    v['class_i'] = ''
-    for i in range(len(v)):
-        v.loc[i, 'class_i'] = det_with_class[det_with_class['id']==v.loc[i, 'id']].iloc[0, 5]  # 5 stands for 'class_i'
-
-    num_class = det_with_class['class_i'].drop_duplicates().size
-
-    v_class = []
-    for i in range(num_class):
-        v_class.append(v[v['class_i']==i])
-
-    print('There are %i class(es)'%num_class)
-
-    dist_mat = pd.read_csv('./data/dist_mat.csv', index_col=0)
-    id_info = pd.read_csv('./data/id2000.csv', index_col=0)
-    dist_mat.index = id_info['id2']
-    dist_mat.columns = id_info['id2']
-    for i in range(len(dist_mat)):
-        for j in range(len(dist_mat)):
-            if i==j:
-                dist_mat.iloc[i, j] = 0
-
-    near_id = pd.DataFrame(np.argsort(np.array(dist_mat)), index = id_info['id2'], columns = id_info['id2'])
-
-    seg = pd.read_csv('./data/segement.csv', header=None)
-
-    det_list_class = []
-    num_dets = 30
-    for i in range(num_class):
-        det_list_class_temp, v_class_temp = get_class_with_node(seg, v_class[i])
-        det_list_class.append(det_list_class_temp)
-        v_class_temp = v_class_temp[v_class_temp['id'].isin(det_list_class_temp[:num_dets])]
-        v_class[i] = v_class_temp
+        return 2*var1 / (var1 + var2 + (u1 - u2)**2)
 
 
-    near_road = []
-    for i in range(num_class):
-        near_road.append(rds_mat(dist_mat, det_list_class[i][:num_dets], seg))
-    
+    # In[9]:
+
+
     NSk_set = np.array([])
-    for i in range(num_class):
-        for j in range(num_class):
+
+    for i in class_set:
+        for j in class_set:
             if i!=j:
                 NSk = get_NSk(v_class[i], v_class[j])
                 NSk_set = np.append(NSk_set, NSk)
 
-    print('NSk is %.3f'%NSk_set.mean())
-    '''
-    ########################
-    # near_road = np.array(pd.read_csv('./data/network/2small_network_nearest_road_id.csv',header = 0))
-    # flow = np.array(pd.read_csv('./data/network/2small_network_speed.csv', header= 0)) #注意header=0 or None
-    near_road = np.array(near_road1)
-    flow = np.array(v_class1.iloc[:, 2:-1])
-
-    # 利用滑动窗口的方式，重构数据为(n，最近路段数，输入时间窗，总路段数)的形式
-    k = 5 # 参数k为需考虑的最近路段数
-    t_p = 24 # 参数t_p为总时间序列长度（天）
-    t_input = 12 #参数t_input为输入时间窗(5min颗粒度)
-    t_pre = 3 #参数t_pre为预测时间窗(5min颗粒度)
-    num_links = 30 #参数num_links为总路段数
-
-    image = []
-    for i in range(np.shape(near_road)[0]):
-        road_id = []
-        for j in range(k):
-            road_id.append(near_road[i][j])
-        image.append(flow[road_id, :])
-    image1 = np.reshape(image, [-1, k, len(flow[0,:])])
-    image2 = np.transpose(image1,(1,2,0))
-    image3 = []
-    label = []
-    day = []
-
-    for i in range(1,t_p):
-        for j in range(180-t_input-t_pre):
-            image3.append(image2[:, i*180+j:i*180+j+t_input, :][:])
-            label.append(flow[:, i*180+j+t_input:i*180+j+t_input+t_pre][:])
-            day.append(flow[:, (i-1)*180+j+t_input:(i-1)*180+j+t_input+t_pre][:])
-            
-
-    image3 = np.asarray(image3)
-    label = np.asarray(label)
-    day =  np.asarray(day)
-
-    #划分前90%数据为训练集，最后10%数据为测试集
-    image_train_source = image3[:np.shape(image3)[0]*1//10]
-    image_test_source = image3[np.shape(image3)[0]*1//10:]
-    label_train_source = label[:np.shape(label)[0]*1//10]
-    label_test_source = label[np.shape(label)[0]*1//10:]
-
-    day_train_source = day[:np.shape(day)[0]*1//10]
-    day_test_source = day[np.shape(day)[0]*1//10:]
-    ########################
+    print(NSk_set.mean())
 
 
-    ########################
-    # near_road = np.array(pd.read_csv('./data/transfer_learning_traffic_data/small_network_nearest_road_id.csv',header = 0))
-    # flow = np.array(pd.read_csv('./data/transfer_learning_traffic_data/small_network_speed.csv', header= 0)) #注意header=0 or None
-    near_road = np.array(near_road2)
-    flow = np.array(v_class2.iloc[:, 2:-1])
+    # # 源代码如下 （训练）
+    # # Input classes here
 
-    # 利用滑动窗口的方式，重构数据为(n，最近路段数，输入时间窗，总路段数)的形式
-    k = 5 # 参数k为需考虑的最近路段数
-    t_p = 24 # 参数t_p为总时间序列长度（天）
-    t_input = 12 #参数t_input为输入时间窗(5min颗粒度)
-    t_pre = 3 #参数t_pre为预测时间窗(5min颗粒度)
-    num_links = 30 #参数num_links为总路段数
+    # In[10]:
 
-    image = []
-    for i in range(np.shape(near_road)[0]):
-        road_id = []
-        for j in range(k):
-            road_id.append(near_road[i][j])
-        image.append(flow[road_id, :])
-    image1 = np.reshape(image, [-1, k, len(flow[0,:])])
-    image2 = np.transpose(image1,(1,2,0))
-    image3 = []
-    label = []
-    day = []
 
-    for i in range(1,t_p):
-        for j in range(180-t_input-t_pre):
-            image3.append(image2[:, i*180+j:i*180+j+t_input, :][:])
-            label.append(flow[:, i*180+j+t_input:i*180+j+t_input+t_pre][:])
-            day.append(flow[:, (i-1)*180+j+t_input:(i-1)*180+j+t_input+t_pre][:])
+    # ind, class
+    # 0  , blue
+    # 1  , green
+    # 2  , yellow  <--
+    # 3  , black   <--
+    # 4  , red     <--
+    # class_src = 2
+    v_class1 = v_class[class_src]  # source
+    near_road1 = np.array(near_road_set[class_src])
 
-    image3 = np.asarray(image3)
-    label = np.asarray(label)
-    day =  np.asarray(day)
+    # class_tar = 4
+    v_class2 = v_class[class_tar]  # target
+    near_road2 = np.array(near_road_set[class_tar])
 
-    #划分前80%数据为训练集，最后20%数据为测试集
-    image_train_target = image3[:np.shape(image3)[0]*1//10]
-    image_test_target = image3[np.shape(image3)[0]*1//10:]
-    label_train_target = label[:np.shape(label)[0]*1//10]
-    label_test_target = label[np.shape(label)[0]*1//10:]
+    k, t_input, t_pre, num_links = 5, 12, 3, v_class1.shape[0]
 
-    day_train_target = day[:np.shape(day)[0]*1//10]
-    day_test_target = day[np.shape(day)[0]*1//10:]
-    ########################
+
+    # In[11]:
+
+
+    near_road_src = near_road1
+    flow_src = v_class1.iloc[:, 2:-1]
+    prop = 1  # proportion of training data
+    from_day = 1
+    to_day = 24
+    t_p = to_day - from_day + 1
+
+    image_train_source, image_test_source, day_train_source, day_test_source, label_train_source, label_test_source= dan_utils.sliding_window(
+        flow_src, near_road_src, from_day, to_day, prop, 
+        k, t_p, t_input, t_pre, num_links
+    )
+
+
+    # In[12]:
+
+
+    near_road_tar = near_road2
+    flow_tar = v_class2.iloc[:, 2:-1]
+    prop = 1/3
+    from_day = 22
+    to_day = 30
+    t_p = to_day - from_day + 1
+
+    image_train_target, image_test_target, day_train_target, day_test_target, label_train_target, label_test_target= dan_utils.sliding_window(
+        flow_tar, near_road_tar, from_day, to_day, prop, 
+        k, t_p, t_input, t_pre, num_links
+    )
+
+    dup_mul = image_train_source.shape[0]//image_train_target.shape[0]
+    dup_r   = image_train_source.shape[0]%image_train_target.shape[0]
+
+    image_train_target, day_train_target, label_train_target = np.concatenate((np.tile(image_train_target, [dup_mul, 1, 1, 1]), image_train_target[:dup_r, :, :, :]), axis=0),np.concatenate((np.tile(day_train_target, [dup_mul, 1, 1]), day_train_target[:dup_r, :, :]), axis=0),np.concatenate((np.tile(label_train_target, [dup_mul, 1, 1]), label_train_target[:dup_r, :, :]), axis=0),
+
+
+    # In[13]:
+
+
+    print(image_train_target.shape)
+    print(image_test_target.shape)
+    print(day_train_target.shape)
+    print(day_test_target.shape)
+    print(label_train_target.shape)
+    print(label_test_target.shape)
+
+
+    # In[14]:
+
 
     #模型构建
     input_data = keras.Input(shape=(k,t_input,num_links), name='input_data')
     input_HA = keras.Input(shape=(num_links, t_pre), name='input_HA')
 
-    x = keras.layers.BatchNormalization(input_shape =(k,t_input,num_links))(input_data)
+    finish_model = dan_models.build_model(input_data, input_HA)
 
-    x = keras.layers.Conv2D(
-                            filters = num_links,
-                            kernel_size = 3,
-                            strides = 1,
-                            padding="SAME",
-                            activation='relu')(x)
 
-    x = keras.layers.AveragePooling2D(pool_size = (2,2),
-                                    strides = 1,
-                                    padding = "SAME",
-                                    )(x)
+    # In[15]:
 
-    x = keras.layers.BatchNormalization()(x)
 
-    x = keras.layers.Conv2D(
-                        filters = num_links,
-                        kernel_size = 3,
-                        strides = 1,
-                        padding="SAME",
-                        activation='relu')(x)
+    class_src
 
-    x = keras.layers.AveragePooling2D(pool_size = (2,2),
-                                    strides = 1,
-                                    padding = "SAME",
-                                    )(x)
-    x = keras.layers.Flatten()(x)
-    x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Dropout(0.5)(x)
-    x = keras.layers.Dense(num_links*t_pre, activation='relu')(x)
 
-    output = keras.layers.Reshape((num_links,t_pre))(x)
+    # In[16]:
 
-    output_final = Merge_Layer()([output, input_HA])
-
-    # construct model
-    finish_model = keras.models.Model([input_data,input_HA], [output_final])
-
-    finish_model.summary()
 
     #参数加载
-    finish_model.load_weights('./model/source.h5')
-
+    finish_model.load_weights('../model/source_%s.h5'%class_color_set[class_src])
     #模型预测
-    model_pre = finish_model.predict([image_test_target,day_test_target])
+    model_pre = finish_model.predict([image_test_target, day_test_target])
+
+
+    # In[17]:
+
+
+    model_pre.shape
+
+
+    # In[18]:
+
+
+    #预测结果存储
+    dan_utils.save_np(model_pre.reshape(model_pre.shape[0], -1), '../model/middle_res/%i_res%i_modelpre_%s_%s.csv'%(randseed, res, class_color_set[class_src], class_color_set[class_tar]))
+
+
+    # In[19]:
+
 
     #transfer without FT 预测精度计算
-    mape_mean1 = mape_loss_func(model_pre, label_test_source)
-    smape_mean1 = smape_loss_func(model_pre, label_test_source)
-    mae_mean1 = mae_loss_func(model_pre, label_test_source)
+    mape_mean = dan_utils.mape_loss_func(model_pre, label_test_target)
+    smape_mean = dan_utils.smape_loss_func(model_pre, label_test_target)
+    mae_mean = dan_utils.mae_loss_func(model_pre, label_test_target)
 
-    print('mape = ' + str(mape_mean1) + '\n' + 'smape = ' + str(smape_mean1) + '\n' + 'mae = ' + str(mae_mean1))
+    print('mape = ' + str(mape_mean) + '\n' + 'smape = ' + str(smape_mean) + '\n' + 'mae = ' + str(mae_mean))
 
-    middle = Model(inputs=[input_data, input_HA]
-    ,outputs=finish_model.get_layer('dense_%i'%(randseed+1)).output)
 
-    middle_result_source = middle.predict([image_train_source, day_train_source])
-    middle_result_target = middle.predict([image_train_target, day_train_target])
+    # In[20]:
 
-    lamb = kl_divergence(v_class1, v_class2)
 
-    loss1 = K.mean(K.square(output_final - label_train_target), axis=-1) 
-    loss2 = lamb * mmd (middle_result_source, middle_result_target)
-    overall_loss = loss1 + loss2
+    # from sklearn import metrics
+    def mmd(x, y):
+        return np.abs(x.mean() - y.mean())
 
-    finish_model.compile(optimizer='adam',loss=new_loss)
 
-    finish_model.fit([image_train_target, day_train_target], label_train_target, epochs=100, batch_size=462,
+    # In[21]:
+
+
+    import scipy.stats
+    def norm_data(data):
+        min_ = min(data)
+        max_ = max(data)
+        normalized_data = data - min_ / (max_ - min_)
+        return normalized_data
+        
+    def js_divergence(set1, set2):
+        p = np.array(set1.iloc[:, 2:-1].T.mean().T)
+        q = np.array(set2.iloc[:, 2:-1].T.mean().T)
+        M=(p+q)/2
+        return 0.5*scipy.stats.entropy(p, M)+0.5*scipy.stats.entropy(q, M)
+        # return scipy.stats.entropy(p, q)  # kl divergence
+
+
+    # In[22]:
+
+
+    def cal_L2_dist(total):
+    #     ipdb.set_trace()
+        total_cpu = total
+        len_ = total_cpu.shape[0]
+        L2_distance = np.zeros([len_, len_])
+        for i in range(total_cpu.shape[1]):
+            total0 = np.broadcast_to(np.expand_dims(total_cpu[:, i], axis=0), (int(total_cpu.shape[0]), int(total_cpu.shape[0])))
+            total1 = np.broadcast_to(np.expand_dims(total_cpu[:, i], axis=1), (int(total_cpu.shape[0]), int(total_cpu.shape[0])))
+            # total0 = total_cpu[:, i].unsqueeze(0).expand(int(total_cpu.size(0)), int(total_cpu.size(0)))
+            # total1 = total_cpu[:, i].unsqueeze(1).expand(int(total_cpu.size(0)), int(total_cpu.size(0)))
+            L2_dist = (total0 - total1)**2
+            L2_distance += L2_dist
+    #     ipdb.set_trace()
+        return L2_distance
+
+    def guassian_kernel(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
+        #source = source.cpu()
+        #target = target.cpu()
+    #     ipdb.set_trace()
+        n_samples = int(source.size)+int(target.size)  # number of samples
+        total = np.concatenate([source, target], axis=0)
+        L2_distance = cal_L2_dist(total)
+        
+        if fix_sigma:
+            bandwidth = fix_sigma
+        else:
+            bandwidth = np.sum(L2_distance.data) / (n_samples**2-n_samples)  # 可能出问题
+        bandwidth /= kernel_mul ** (kernel_num // 2)
+        bandwidth_list = [bandwidth * (kernel_mul**i) for i in range(kernel_num)]
+        kernel_val = [np.exp(-L2_distance / bandwidth_temp) for bandwidth_temp in bandwidth_list]
+        return sum(kernel_val)  #/len(kernel_val)
+
+    def mmd_rbf_accelerate(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
+    #     ipdb.set_trace()
+        print(source.shape)
+        print(target.shape)
+        batch_size = int(source.size)
+        kernels = guassian_kernel(source, target,
+            kernel_mul=kernel_mul, kernel_num=kernel_num, fix_sigma=fix_sigma)
+        loss = 0
+        for i in range(batch_size):
+            s1, s2 = i, (i+1) % batch_size
+            t1, t2 = s1 + batch_size, s2 + batch_size
+            loss += kernels[s1, s2] + kernels[t1, t2]
+            loss -= kernels[s1, t2] + kernels[s2, t1]
+    #     ipdb.set_trace()
+        return loss / float(batch_size)
+
+    def mmd_rbf_noaccelerate(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
+    #     ipdb.set_trace()
+        batch_size = int(source.shape[0])  # ?
+        kernels = guassian_kernel(source, target,
+                                kernel_mul=kernel_mul, kernel_num=kernel_num, fix_sigma=fix_sigma)
+        XX = kernels[:batch_size, :batch_size]
+        YY = kernels[batch_size:, batch_size:]
+        XY = kernels[:batch_size, batch_size:]
+        YX = kernels[batch_size:, :batch_size]
+    #     ipdb.set_trace()
+        loss = np.mean(XX + YY - XY -YX)
+        return loss
+
+
+    # In[23]:
+
+
+    middle1 = Model(inputs=[input_data, input_HA], outputs=finish_model.get_layer('dense_1').output)
+    middle2 = Model(inputs=[input_data, input_HA], outputs=finish_model.get_layer('dense_2').output)
+
+    middle_result_source1 = middle1.predict([image_train_source, day_train_source])
+    middle_result_target1 = middle1.predict([image_train_target, day_train_target])
+
+    middle_result_source2 = middle2.predict([image_train_source, day_train_source])
+    middle_result_target2 = middle2.predict([image_train_target, day_train_target])
+
+    # save intermidiate results
+    dan_utils.save_np(middle_result_source1, '../model/middle_res/%i_res%i_middle_result_source1_%s_%s.csv'                 %(randseed, res, class_color_set[class_src], class_color_set[class_tar]))
+    dan_utils.save_np(middle_result_target1, '../model/middle_res/%i_res%i_middle_result_target1_%s_%s.csv'                 %(randseed, res, class_color_set[class_src], class_color_set[class_tar]))
+    dan_utils.save_np(middle_result_source2, '../model/middle_res/%i_res%i_middle_result_source2_%s_%s.csv'                 %(randseed, res, class_color_set[class_src], class_color_set[class_tar]))
+    dan_utils.save_np(middle_result_target2, '../model/middle_res/%i_res%i_middle_result_target2_%s_%s.csv'                 %(randseed, res, class_color_set[class_src], class_color_set[class_tar]))
+
+
+    lamb = js_divergence(v_class1.iloc[:, 2:-1], v_class2.iloc[:, 2:-1])
+    # lamb = 0
+
+    def new_loss(output_final, label_train_target):
+        loss0 = K.mean(K.square(output_final - label_train_target), axis=-1) 
+        loss1 = mmd_rbf_noaccelerate(middle_result_source1, middle_result_target1)
+        loss2 = mmd_rbf_noaccelerate(middle_result_source2, middle_result_target2)
+    #     loss2 = lamb * ( mmd(middle_result_source1, middle_result_target1) + mmd(middle_result_source2, middle_result_target2) )
+    #     loss2 = 0.001 * mmd(middle_result_source2, middle_result_target2)
+    #     print('Lambda is %.4f'%lamb)
+        print(middle_result_source1.shape)
+        print(middle_result_target1.shape)
+        overall_loss = loss0 + lamb* (loss1 + loss2)
+        
+        return overall_loss
+
+
+    # In[24]:
+
+
+    finish_model.compile(optimizer='adam', loss=new_loss)
+
+
+    # In[25]:
+
+
+    finish_model.fit([image_train_target, day_train_target], label_train_target, epochs=300, batch_size=4620,
     validation_data=([image_test_target,day_test_target], label_test_target))
 
-    model_pre = finish_model.predict([image_test_target,day_test_target])
+
+    # In[26]:
+
+
+    model_pre = finish_model.predict([image_test_target, day_test_target])
+
+
+    # In[27]:
+
+
+    #模型保存
+    finish_model.save_weights('../model/transfer_DAN_%s_%s_mape=%.5f.h5'%(class_color_set[class_src], class_color_set[class_tar], dan_utils.mape_loss_func(model_pre, label_test_target)))
+
+
+    # In[28]:
+
 
     #transfer with DAN 预测精度计算
 
-    mape_mean2 = mape_loss_func(model_pre, label_test_target)
-    smape_mean2 = smape_loss_func(model_pre, label_test_target)
-    mae_mean2 = mae_loss_func(model_pre, label_test_target)
+    mape_mean = dan_utils.mape_loss_func(model_pre, label_test_target)
+    smape_mean = dan_utils.smape_loss_func(model_pre, label_test_target)
+    mae_mean = dan_utils.mae_loss_func(model_pre, label_test_target)
 
-    print('mape = ' + str(mape_mean2) + '\n' + 'smape = ' + str(smape_mean2) + '\n' + 'mae = ' + str(mae_mean2))
+    print('mape = ' + str(mape_mean) + '\n' + 'smape = ' + str(smape_mean) + '\n' + 'mae = ' + str(mae_mean))
 
-    mape_list = []
-    for i in range(num_links):
-        a1 = mape_loss_func(model_pre[:,i,:], label_test_target[:,i,:])
-        mape_list.append(a1)
-
-    mape_pd = pd.Series(mape_list)
-    # mape_pd.sort_values()
-    return NSk_value, mape_mean1, mape_mean2
-    '''
-    return NSk_set.mean()
-
-if __name__ == '__main__':
-    NSk_value_set, mape_mean1_set, mape_mean2_set = [], [], []
-    plot_len = 10
-    for randseed in range(plot_len):
-        '''
-        NSk_value, mape_mean1, mape_mean2 = main(randseed, class1, class2, class3, class4)
-        NSk_value_set.append(NSk_value)
-        mape_mean1_set.append(mape_mean1)
-        mape_mean2_set.append(mape_mean2)
-        '''
-        NSk_value = main(randseed)
-    
-    '''
-    fig = plt.figure()
-    ax1 = fig.add_subplot(131)
-    ax1.plot(range(plot_len), NSk_value_set)
-    ax2 = fig.add_subplot(132)
-    ax2.plot(range(plot_len), mape_mean1_set)
-    ax3 = fig.add_subplot(133)
-    ax3.plot(range(plot_len), mape_mean2_set)
-    plt.show()
-    '''
+for i in range(5):
+    for j in range(5):
+        if i != j:
+            main(i, j)
