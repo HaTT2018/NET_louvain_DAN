@@ -4,17 +4,21 @@ import random
 import tensorflow as tf
 import pandas as pd
 
-def mape_loss_func(preds, labels):
-    mask = labels > .05
+def mape_loss_func(preds, labels, m):
+    mask = labels > m
     return np.mean(np.fabs(labels[mask]-preds[mask])/labels[mask])
 
-def smape_loss_func(preds, labels):
-    mask= labels > .05
+def smape_loss_func(preds, labels, m):
+    mask= labels > m
     return np.mean(2*np.fabs(labels[mask]-preds[mask])/(np.fabs(labels[mask])+np.fabs(preds[mask])))
 
-def mae_loss_func(preds, labels):
-    mask= labels > .05
-    return np.fabs((labels[mask]-preds[mask])).mean()
+def mae_loss_func(preds, labels, m):
+    mask= labels > m
+    return np.mean(np.fabs((labels[mask]-preds[mask])))
+
+def nrmse_loss_func(preds, labels, m):
+    mask= labels > m
+    return np.sqrt(np.sum((preds[mask] - labels[mask])**2)/preds[mask].flatten().shape[0])/(preds[mask].max() - preds[mask].min())
 
 def eliminate_nan(b):
     a = np.array(b)
@@ -59,7 +63,8 @@ def rds_mat(old_dist_mat, det_ids, seg):
     new_near_id_mat = np.argsort(new_dist_mat)
     return new_near_id_mat
 
-def sliding_window(flow, near_road, from_day, to_day, prop, k, t_p, t_input, t_pre, num_links):
+def sliding_window(flow, near_road, from_day, to_day, prop, num_links, k=5, t_input=12, t_pre=6):
+    t_p = to_day - from_day
     flow = np.array(flow)
     # 选数据
     flow = flow[:, 144*(from_day-1):144*(to_day)]
