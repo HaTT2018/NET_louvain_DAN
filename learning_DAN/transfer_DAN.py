@@ -25,23 +25,25 @@ from tensorflow.keras.layers import Layer
 import dan_models
 import dan_utils
 
+
+# In[3]:
+
+
+physical_devices = tf.config.list_physical_devices('GPU') 
+tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
+
+# # Load data
+
+# In[4]:
+
 def main(class_src, class_tar):
-    # In[3]:
-
-
-    physical_devices = tf.config.list_physical_devices('GPU') 
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
-
-
-    # # Load data
-
-    # In[4]:
-
-
     class_set = [2, 3, 4]
     randseed = 25
     res = 11
     v, v_class, id_402, part1, part2, seg, det_list_class, near_road_set          = dan_utils.load_data(class_set, res, randseed)
+
+
 
     # ind, class
     # 0  , blue
@@ -50,6 +52,7 @@ def main(class_src, class_tar):
     # 3  , black   <--
     # 4  , red     <--
     class_color_set = ['b', 'g', 'y', 'black', 'r']
+
 
     # ## Evaluation of 2 datasets
 
@@ -87,7 +90,7 @@ def main(class_src, class_tar):
     # # 源代码如下 （训练）
     # # Input classes here
 
-    # In[10]:
+    # In[19]:
 
 
     # ind, class
@@ -104,10 +107,10 @@ def main(class_src, class_tar):
     v_class2 = v_class[class_tar]  # target
     near_road2 = np.array(near_road_set[class_tar])
 
-    k, t_input, t_pre, num_links = 5, 12, 3, v_class1.shape[0]
+    num_links = v_class1.shape[0]
 
 
-    # In[11]:
+    # In[20]:
 
 
     near_road_src = near_road1
@@ -115,15 +118,13 @@ def main(class_src, class_tar):
     prop = 1  # proportion of training data
     from_day = 1
     to_day = 24
-    t_p = to_day - from_day + 1
 
     image_train_source, image_test_source, day_train_source, day_test_source, label_train_source, label_test_source= dan_utils.sliding_window(
-        flow_src, near_road_src, from_day, to_day, prop, 
-        k, t_p, t_input, t_pre, num_links
+        flow_src, near_road_src, from_day, to_day, prop, num_links
     )
 
 
-    # In[12]:
+    # In[21]:
 
 
     near_road_tar = near_road2
@@ -131,11 +132,9 @@ def main(class_src, class_tar):
     prop = 1/3
     from_day = 22
     to_day = 30
-    t_p = to_day - from_day + 1
 
     image_train_target, image_test_target, day_train_target, day_test_target, label_train_target, label_test_target= dan_utils.sliding_window(
-        flow_tar, near_road_tar, from_day, to_day, prop, 
-        k, t_p, t_input, t_pre, num_links
+        flow_tar, near_road_tar, from_day, to_day, prop, num_links
     )
 
     dup_mul = image_train_source.shape[0]//image_train_target.shape[0]
@@ -144,7 +143,7 @@ def main(class_src, class_tar):
     image_train_target, day_train_target, label_train_target = np.concatenate((np.tile(image_train_target, [dup_mul, 1, 1, 1]), image_train_target[:dup_r, :, :, :]), axis=0),np.concatenate((np.tile(day_train_target, [dup_mul, 1, 1]), day_train_target[:dup_r, :, :]), axis=0),np.concatenate((np.tile(label_train_target, [dup_mul, 1, 1]), label_train_target[:dup_r, :, :]), axis=0),
 
 
-    # In[13]:
+    # In[22]:
 
 
     print(image_train_target.shape)
@@ -155,8 +154,12 @@ def main(class_src, class_tar):
     print(label_test_target.shape)
 
 
-    # In[14]:
+    # In[26]:
 
+
+    t_input = image_train_source.shape[2]
+    t_pre = label_train_source.shape[2]
+    k = image_train_source.shape[1]
 
     #模型构建
     input_data = keras.Input(shape=(k,t_input,num_links), name='input_data')
@@ -165,13 +168,7 @@ def main(class_src, class_tar):
     finish_model = dan_models.build_model(input_data, input_HA)
 
 
-    # In[15]:
-
-
-    class_src
-
-
-    # In[16]:
+    # In[27]:
 
 
     #参数加载
@@ -180,39 +177,27 @@ def main(class_src, class_tar):
     model_pre = finish_model.predict([image_test_target, day_test_target])
 
 
-    # In[17]:
+    # In[39]:
 
 
-    model_pre.shape
-
-
-    # In[18]:
-
-
-    #预测结果存储
+    #预测结果存储(中间层数据)
     dan_utils.save_np(model_pre.reshape(model_pre.shape[0], -1), '../model/middle_res/%i_res%i_modelpre_%s_%s.csv'%(randseed, res, class_color_set[class_src], class_color_set[class_tar]))
 
 
-    # In[19]:
+    # In[40]:
 
 
     #transfer without FT 预测精度计算
-    mape_mean = dan_utils.mape_loss_func(model_pre, label_test_target)
-    smape_mean = dan_utils.smape_loss_func(model_pre, label_test_target)
-    mae_mean = dan_utils.mae_loss_func(model_pre, label_test_target)
+    m = 5
+    nrmse_mean = dan_utils.nrmse_loss_func(model_pre, label_test_target, m)
+    mape_mean = dan_utils.mape_loss_func(model_pre, label_test_target, m)
+    smape_mean = dan_utils.smape_loss_func(model_pre, label_test_target, m)
+    mae_mean = dan_utils.mae_loss_func(model_pre, label_test_target, m)
 
-    print('mape = ' + str(mape_mean) + '\n' + 'smape = ' + str(smape_mean) + '\n' + 'mae = ' + str(mae_mean))
-
-
-    # In[20]:
-
-
-    # from sklearn import metrics
-    def mmd(x, y):
-        return np.abs(x.mean() - y.mean())
+    print('nrmse = ' + str(nrmse_mean) + '\n' + 'mape = ' + str(mape_mean) + '\n' + 'smape = ' + str(smape_mean) + '\n' + 'mae = ' + str(mae_mean))
 
 
-    # In[21]:
+    # In[41]:
 
 
     import scipy.stats
@@ -230,7 +215,7 @@ def main(class_src, class_tar):
         # return scipy.stats.entropy(p, q)  # kl divergence
 
 
-    # In[22]:
+    # In[42]:
 
 
     def cal_L2_dist(total):
@@ -291,11 +276,11 @@ def main(class_src, class_tar):
         XY = kernels[:batch_size, batch_size:]
         YX = kernels[batch_size:, :batch_size]
     #     ipdb.set_trace()
-        loss = np.mean(XX + YY - XY -YX)
+        loss = np.mean(XX + YY - XY - YX)
         return loss
 
 
-    # In[23]:
+    # In[43]:
 
 
     middle1 = Model(inputs=[input_data, input_HA], outputs=finish_model.get_layer('dense_1').output)
@@ -331,44 +316,45 @@ def main(class_src, class_tar):
         return overall_loss
 
 
-    # In[24]:
+    # In[44]:
 
 
     finish_model.compile(optimizer='adam', loss=new_loss)
 
 
-    # In[25]:
+    # In[47]:
 
 
     finish_model.fit([image_train_target, day_train_target], label_train_target, epochs=300, batch_size=4620,
     validation_data=([image_test_target,day_test_target], label_test_target))
 
 
-    # In[26]:
+    # In[48]:
 
 
     model_pre = finish_model.predict([image_test_target, day_test_target])
 
 
-    # In[27]:
-
-
-    #模型保存
-    finish_model.save_weights('../model/transfer_DAN_%s_%s_mape=%.5f.h5'%(class_color_set[class_src], class_color_set[class_tar], dan_utils.mape_loss_func(model_pre, label_test_target)))
-
-
-    # In[28]:
+    # In[51]:
 
 
     #transfer with DAN 预测精度计算
 
-    mape_mean = dan_utils.mape_loss_func(model_pre, label_test_target)
-    smape_mean = dan_utils.smape_loss_func(model_pre, label_test_target)
-    mae_mean = dan_utils.mae_loss_func(model_pre, label_test_target)
+    nrmse_mean = dan_utils.nrmse_loss_func(model_pre, label_test_target, m)
+    mape_mean = dan_utils.mape_loss_func(model_pre, label_test_target, m)
+    smape_mean = dan_utils.smape_loss_func(model_pre, label_test_target, m)
+    mae_mean = dan_utils.mae_loss_func(model_pre, label_test_target, m)
 
-    print('mape = ' + str(mape_mean) + '\n' + 'smape = ' + str(smape_mean) + '\n' + 'mae = ' + str(mae_mean))
+    print('nrmse = ' + str(nrmse_mean) + '\n' + 'mape = ' + str(mape_mean) + '\n' + 'smape = ' + str(smape_mean) + '\n' + 'mae = ' + str(mae_mean))
+
+
+    # In[52]:
+
+
+    #模型保存
+    finish_model.save_weights('../model/transfer_DAN_%s_%s_mape=%.5f_nrmse=%.5f.h5'%(class_color_set[class_src], class_color_set[class_tar], mape_mean, nrmse_mean))
 
 for i in range(5):
     for j in range(5):
-        if i != j:
+        if i!=j:
             main(i, j)
