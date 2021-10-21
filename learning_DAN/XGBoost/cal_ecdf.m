@@ -27,6 +27,10 @@ for i=1:25
     rmse(i)=sqrt(mean(mean(sub_temp.^2)));
     smape(i)=mean(mean(abs(sub_temp)./sum_temp));
     mape(i)=mean(abs(sub_temp)./abs(true_temp));
+    mae(i)=mean(abs(sub_temp));
 end
-disp(mean(mape))
+disp(mean(mape(isinf(mape)==0)))
+disp(mean(smape))
+disp(mean(nrmse))
+disp(mean(mae))
 save(char(['C:\Users\10169\Documents\Github\NET_louvain_DAN\model\base_XGBoost_mape=', num2str(mean(mape)),'.mat']))

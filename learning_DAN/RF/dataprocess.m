@@ -12,10 +12,10 @@ for i=1:25
     temp3=[];
     temp4=[];
     for j=1:144*7
-      temp1=[temp1;V2(i,j:j+9)];
-      temp2=[temp2;V2(i,j+10)];
-      temp3=[temp3;V2(i,j+144*3:j+144*3+9)];
-      temp4=[temp4;V2(i,j+144*3+10)];
+      temp1=[temp1;V2(i,j:j+3)];
+      temp2=[temp2;V2(i,j+4)];
+      temp3=[temp3;V2(i,j+144*3:j+144*3+3)];
+      temp4=[temp4;V2(i,j+144*3+4)];
     end
     x_train=[x_train;temp1];
     y_train=[y_train;temp2];
