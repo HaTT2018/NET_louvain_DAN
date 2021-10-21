@@ -18,7 +18,7 @@ def mae_loss_func(preds, labels, m):
 
 def nrmse_loss_func(preds, labels, m):
     mask= labels > m
-    return np.sqrt(np.sum((preds[mask] - labels[mask])**2)/preds[mask].flatten().shape[0])/(preds[mask].max() - preds[mask].min())
+    return np.sqrt(np.sum((labels[mask]-preds[mask])**2)/np.sum(np.square(labels[mask])))
 
 def eliminate_nan(b):
     a = np.array(b)
@@ -149,9 +149,9 @@ def load_data(class_set, res=11, randseed=25):
     # Return:
     # det_list_class: all the detectors of class i before manual selection
     # 把矩阵分类
-    setup_seed(randseed)
+    # setup_seed(randseed)
 
-    v = pd.read_csv('../data/v_20_aggragated.csv')
+    v = pd.read_csv('../data/q_20_aggragated.csv')
     v = v.rename(columns={'Unnamed: 0': 'id'})
     id_402 = pd.read_csv('../res/%i_res%i_id_402_withclass.csv'%(randseed, res), index_col=0)
     part1 = pd.read_csv('../res/%i_res%i_det_partition_results1.csv'%(randseed, res))
