@@ -3,11 +3,7 @@ network_classification/img/.DS_Store
 env/.DS_Store
 .DS_Store
 *.pyc
-learning_DAN/.ipynb_checkpoints/base_FC-checkpoint.ipynb
-learning_DAN/.ipynb_checkpoints/base_ST-DTNN-checkpoint.ipynb
-learning_DAN/.ipynb_checkpoints/base_FC-checkpoint.ipynb
-learning_DAN/.ipynb_checkpoints/base_ST-DTNN-checkpoint.ipynb
-learning_DAN/.ipynb_checkpoints/base_RF-checkpoint.ipynb
-learning_DAN/.ipynb_checkpoints/base_XGBoost-checkpoint.ipynb
-learning_DAN/.ipynb_checkpoints/transfer_DAN-checkpoint.ipynb
-network_classification/.ipynb_checkpoints/search_rand_seed-checkpoint.ipynb
+learning_DAN/.ipynb_checkpoints/
+network_classification/.ipynb_checkpoints/
+runs_base/
+
