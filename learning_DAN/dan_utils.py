@@ -151,7 +151,7 @@ def load_data(class_set, res=11, randseed=25):
     # 把矩阵分类
     setup_seed(randseed)
 
-    v = pd.read_csv('../data/q_20_aggragated.csv')
+    v = pd.read_csv('../data/v_20_aggragated.csv')
     v = v.rename(columns={'Unnamed: 0': 'id'})
     id_402 = pd.read_csv('../res/%i_res%i_id_402_withclass.csv'%(randseed, res), index_col=0)
     part1 = pd.read_csv('../res/%i_res%i_det_partition_results1.csv'%(randseed, res))
