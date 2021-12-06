@@ -6,4 +6,4 @@ env/.DS_Store
 learning_DAN/.ipynb_checkpoints/
 network_classification/.ipynb_checkpoints/
 runs_base/
-
+data/region_data/
