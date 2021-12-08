@@ -10,11 +10,11 @@ def mape_loss_func(preds, labels, m):
 
 def smape_loss_func(preds, labels, m):
     mask= labels > m
-    return np.mean(2*np.fabs(labels[mask]-preds[mask])/(np.fabs(labels[mask])+np.fabs(preds[mask])))
+    return np.mean(np.fabs(labels[mask]-preds[mask])/(np.fabs(labels[mask])+np.fabs(preds[mask])))
 
 def mae_loss_func(preds, labels, m):
     mask= labels > m
-    return np.mean(np.fabs((labels[mask]-preds[mask])))
+    return np.fabs((labels[mask]-preds[mask])).mean()
 
 def nrmse_loss_func(preds, labels, m):
     mask= labels > m
