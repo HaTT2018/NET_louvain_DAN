@@ -1,0 +1,2 @@
+,mask,res,prop,randseed,window_size,pred_samp,train data samples,val data samples,num detectors
+value,0.0,11,0.2,431,10,6,256,1024,40

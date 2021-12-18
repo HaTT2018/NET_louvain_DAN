@@ -4,6 +4,4 @@ env/.DS_Store
 *.pyc
 learning_DAN/.ipynb_checkpoints/
 network_classification/.ipynb_checkpoints/
-runs_base/
-data/region_data/
 base_LSTM/.ipynb_checkpoints/
